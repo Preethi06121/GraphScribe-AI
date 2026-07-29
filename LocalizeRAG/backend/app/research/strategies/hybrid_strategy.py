@@ -51,3 +51,6 @@ class HybridStrategy(RetrievalStrategy):
             retrieved_items=items,
             success=True,
         )
+
+    async def retrieve_context(self, query: str, k: int = 5):
+        return await self._hybrid_retriever.retrieve(query)

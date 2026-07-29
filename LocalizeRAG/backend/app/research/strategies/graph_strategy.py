@@ -61,3 +61,53 @@ class GraphStrategy(RetrievalStrategy):
             retrieved_items=items,
             success=True,
         )
+
+    async def retrieve_context(self, query: str, k: int = 5):
+        from app.schemas.retrieval import (
+            Citation,
+            ContextGraphItem,
+            HybridContext,
+            HybridContextMetadata,
+        )
+
+        processed = await asyncio.to_thread(self._query_processor.process, query)
+        hits = await asyncio.to_thread(self._graph_retriever.retrieve, processed, k)
+
+        graph_items = [
+            ContextGraphItem(
+                entity_name=hit.entity_name,
+                entity_type=hit.entity_type,
+                connected_entity=hit.connected_entity,
+                relationship_type=hit.relationship_type,
+                document_id=hit.document_id,
+                document_name=hit.document_name,
+                page_number=hit.page_number,
+                score=hit.score,
+                source="graph",
+            )
+            for hit in hits
+        ]
+        citations = [
+            Citation(
+                document_id=hit.document_id,
+                document_name=hit.document_name or "Graph",
+                page=hit.page_number,
+                source="graph",
+                reference=f"{hit.entity_name}-{hit.relationship_type or 'node'}",
+            )
+            for hit in hits
+        ]
+        return HybridContext(
+            documents=[],
+            graph=graph_items,
+            citations=citations,
+            metadata=HybridContextMetadata(
+                query=query,
+                normalized_query=processed.normalized,
+                keywords=processed.keywords,
+                vector_hits=0,
+                graph_hits=len(graph_items),
+                vector_weight=0.0,
+                graph_weight=1.0,
+            ),
+        )

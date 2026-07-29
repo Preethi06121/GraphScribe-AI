@@ -59,3 +59,51 @@ class VectorStrategy(RetrievalStrategy):
             retrieved_items=items,
             success=True,
         )
+
+    async def retrieve_context(self, query: str, k: int = 5):
+        from app.schemas.retrieval import (
+            Citation,
+            ContextDocument,
+            HybridContext,
+            HybridContextMetadata,
+        )
+
+        processed = await asyncio.to_thread(self._query_processor.process, query)
+        hits = await asyncio.to_thread(self._vector_retriever.retrieve, processed, k)
+
+        docs = [
+            ContextDocument(
+                chunk=hit.chunk,
+                score=hit.score,
+                page=hit.page,
+                document_id=hit.document_id,
+                document_name=hit.document_name,
+                chunk_id=hit.chunk_id,
+                source="vector",
+            )
+            for hit in hits
+        ]
+        citations = [
+            Citation(
+                document_id=hit.document_id,
+                document_name=hit.document_name or "Doc",
+                page=hit.page,
+                source="vector",
+                reference=hit.chunk_id or f"p{hit.page}",
+            )
+            for hit in hits
+        ]
+        return HybridContext(
+            documents=docs,
+            graph=[],
+            citations=citations,
+            metadata=HybridContextMetadata(
+                query=query,
+                normalized_query=processed.normalized,
+                keywords=processed.keywords,
+                vector_hits=len(docs),
+                graph_hits=0,
+                vector_weight=1.0,
+                graph_weight=0.0,
+            ),
+        )

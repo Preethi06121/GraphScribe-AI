@@ -179,10 +179,11 @@ def get_comparison_service() -> ComparisonService:
 def get_generation_engine() -> GenerationEngine:
     settings = get_settings()
     return GenerationEngine(
-        hybrid_retriever=get_hybrid_retriever(),
+        strategy_factory=get_strategy_factory(),
         prompt_builder=get_prompt_builder(),
         provider=create_provider(settings),
         response_formatter=get_response_formatter(),
         explainability_generator=get_explainability_generator(),
+        hybrid_retriever=get_hybrid_retriever(),
     )
 

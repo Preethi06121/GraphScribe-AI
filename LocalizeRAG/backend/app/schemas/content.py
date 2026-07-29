@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -7,6 +9,7 @@ class ContentGenerateRequest(BaseModel):
     country: str = Field(..., min_length=1)
     tone: str = Field(default="Professional")
     length: int = Field(default=1500, ge=200, le=10000)
+    retrieval_strategy: str = Field(default="HYBRID")
 
 
 class ArticleSection(BaseModel):

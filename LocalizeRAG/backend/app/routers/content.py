@@ -17,6 +17,13 @@ async def generate_content(
     request: ContentGenerateRequest,
     generation_engine: GenerationEngine = Depends(get_generation_engine),
 ) -> GeneratedArticleResponse:
+    strat = (request.retrieval_strategy or "HYBRID").strip().upper()
+    if strat not in {"VECTOR", "GRAPH", "HYBRID"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid retrieval strategy '{request.retrieval_strategy}'. Supported values are: VECTOR, GRAPH, HYBRID.",
+        )
+
     try:
         return await generation_engine.generate_article(
             topic=request.topic.strip(),
@@ -24,6 +31,7 @@ async def generate_content(
             country=request.country.strip(),
             tone=request.tone.strip(),
             length=request.length,
+            retrieval_strategy=strat,
         )
     except ValueError as exc:
         logger.warning("Invalid content generation request: %s", exc)

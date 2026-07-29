@@ -10,22 +10,35 @@ from app.schemas.content import GeneratedArticleResponse
 logger = logging.getLogger(__name__)
 
 
+from app.research.factory import StrategyFactory
+
+
 class GenerationEngine:
-    """Orchestrates retrieval-grounded long-form article generation."""
+    """Orchestrates strategy-aware retrieval-grounded long-form article generation."""
 
     def __init__(
         self,
-        hybrid_retriever: HybridRetriever,
-        prompt_builder: PromptBuilder,
-        provider: LLMProvider,
-        response_formatter: ResponseFormatter,
-        explainability_generator: ExplainabilityGenerator,
+        strategy_factory: StrategyFactory | HybridRetriever | None = None,
+        prompt_builder: PromptBuilder | None = None,
+        provider: LLMProvider | None = None,
+        response_formatter: ResponseFormatter | None = None,
+        explainability_generator: ExplainabilityGenerator | None = None,
+        hybrid_retriever: HybridRetriever | None = None,
     ) -> None:
-        self._hybrid_retriever = hybrid_retriever
-        self._prompt_builder = prompt_builder
+        if isinstance(strategy_factory, StrategyFactory):
+            self._strategy_factory = strategy_factory
+            self._hybrid_retriever = hybrid_retriever
+        elif strategy_factory is not None:
+            self._strategy_factory = None
+            self._hybrid_retriever = strategy_factory
+        else:
+            self._strategy_factory = None
+            self._hybrid_retriever = hybrid_retriever
+
+        self._prompt_builder = prompt_builder or PromptBuilder()
         self._provider = provider
-        self._response_formatter = response_formatter
-        self._explainability_generator = explainability_generator
+        self._response_formatter = response_formatter or ResponseFormatter()
+        self._explainability_generator = explainability_generator or ExplainabilityGenerator()
 
     async def generate_article(
         self,
@@ -34,16 +47,18 @@ class GenerationEngine:
         country: str,
         tone: str,
         length: int,
+        retrieval_strategy: str = "HYBRID",
     ) -> GeneratedArticleResponse:
         logger.info(
-            "Starting article generation: topic='%s' audience='%s' country='%s'",
+            "Starting article generation: topic='%s' audience='%s' country='%s' strategy='%s'",
             topic,
             audience,
             country,
+            retrieval_strategy,
         )
 
         retrieval_query = self._build_retrieval_query(topic, audience, country)
-        context = await self._hybrid_retriever.retrieve(retrieval_query)
+        context = await self._retrieve_context(retrieval_query, retrieval_strategy)
         explainability = self._explainability_generator.generate(context)
 
         prompt = self._prompt_builder.build_article_prompt(
@@ -78,6 +93,19 @@ class GenerationEngine:
             article.metadata.word_count,
         )
         return article
+
+    async def _retrieve_context(self, query: str, strategy_name: str):
+        if self._strategy_factory:
+            strategy = self._strategy_factory.get_strategy(strategy_name)
+            if hasattr(strategy, "retrieve_context"):
+                return await strategy.retrieve_context(query)
+            if self._hybrid_retriever:
+                return await self._hybrid_retriever.retrieve(query)
+            raise ValueError(f"Unable to retrieve context for strategy '{strategy_name}'")
+        elif self._hybrid_retriever:
+            return await self._hybrid_retriever.retrieve(query)
+        else:
+            raise ValueError("No strategy factory or retriever configured.")
 
     @staticmethod
     def _build_retrieval_query(topic: str, audience: str, country: str) -> str:
