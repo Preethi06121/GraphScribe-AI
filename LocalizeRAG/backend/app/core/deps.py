@@ -159,6 +159,23 @@ def get_explainability_generator() -> ExplainabilityGenerator:
     return ExplainabilityGenerator()
 
 
+from app.research.comparison_service import ComparisonService
+from app.research.factory import StrategyFactory
+
+
+def get_strategy_factory() -> StrategyFactory:
+    return StrategyFactory(
+        vector_retriever=get_vector_retriever(),
+        graph_retriever=get_graph_retriever(),
+        hybrid_retriever=get_hybrid_retriever(),
+        query_processor=get_query_processor(),
+    )
+
+
+def get_comparison_service() -> ComparisonService:
+    return ComparisonService(factory=get_strategy_factory())
+
+
 def get_generation_engine() -> GenerationEngine:
     settings = get_settings()
     return GenerationEngine(
@@ -168,3 +185,4 @@ def get_generation_engine() -> GenerationEngine:
         response_formatter=get_response_formatter(),
         explainability_generator=get_explainability_generator(),
     )
+
